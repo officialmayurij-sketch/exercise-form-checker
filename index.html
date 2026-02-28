@@ -1,12 +1,75 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercise Form Checker</title>
+  <title>Exercise Form Checker</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 </head>
 <body>
-    <h1>Exercise Form Checker</h1>
-    <p>Welcome to the Exercise Form Checker application.</p>
+  <h2>Squat Form Checker</h2>
+  <video id="video" width="640" height="480" autoplay></video>
+  <canvas id="canvas" width="640" height="480"></canvas>
+  <h3 id="feedback">Checking...</h3>
+
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const feedback = document.getElementById("feedback");
+
+const pose = new Pose({
+  locateFile: (file) => {
+    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+  }
+});
+
+pose.setOptions({
+  modelComplexity: 1,
+  smoothLandmarks: true,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5
+});
+
+pose.onResults(results => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+
+  if (results.poseLandmarks) {
+    const hip = results.poseLandmarks[24];
+    const knee = results.poseLandmarks[26];
+    const ankle = results.poseLandmarks[28];
+
+    const angle = calculateAngle(hip, knee, ankle);
+
+    if (angle > 80 && angle < 100) {
+      feedback.innerText = "🟢 Good Squat!";
+    } else {
+      feedback.innerText = "🔴 Fix your form!";
+    }
+  }
+});
+
+function calculateAngle(a, b, c) {
+  const ab = { x: a.x - b.x, y: a.y - b.y };
+  const cb = { x: c.x - b.x, y: c.y - b.y };
+
+  const dot = ab.x * cb.x + ab.y * cb.y;
+  const magAB = Math.sqrt(ab.x * ab.x + ab.y * ab.y);
+  const magCB = Math.sqrt(cb.x * cb.x + cb.y * cb.y);
+
+  const angle = Math.acos(dot / (magAB * magCB));
+  return angle * (180 / Math.PI);
+}
+
+const camera = new Camera(video, {
+  onFrame: async () => {
+    await pose.send({image: video});
+  },
+  width: 640,
+  height: 480
+});
+camera.start();
+</script>
 </body>
 </html>
